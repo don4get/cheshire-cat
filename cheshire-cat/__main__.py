@@ -14,8 +14,8 @@ def main():
     # Import parameters
     param = Param()
 
-    list_of_tickers = get_biggest_n_tickers(2)
-    print(list_of_tickers)
+    list_of_tickers = get_biggest_n_tickers(100)
+    # print(list_of_tickers)
 
     tickers_df = None
 
@@ -31,23 +31,26 @@ def main():
 
     tickers_df = tickers_df.T
     df = tickers_df.set_index('symbol')
-    df = df.T
-    print(df.keys())
+    # print(df.keys())
+    cell_values = df.values.tolist()
+    cell_values.insert(0, df.columns.tolist())
+    # print(cell_values)
+
+    df.to_csv("fundamentals.csv")
 
     fig = go.Figure(data=[go.Table(
-            header=dict(values=list(df.columns),
+            header=dict(values=[""]+list(df.T.columns),
                         fill_color='paleturquoise',
                         align='left',
                         ),
-            cells=dict(values=df.transpose().values.tolist(),
+            cells=dict(values=cell_values,
                        fill_color='lavender',
                        align='left'))
     ])
 
     fig.show()
-
     # Log data
-    write_data_to_hdf5(tickers_df, param.exp_name)
+    # write_data_to_hdf5(tickers_df, param.exp_name)
 
 if __name__ == '__main__':
     main()
