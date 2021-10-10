@@ -9,3 +9,5 @@ class Param:
     def __init__(self):
 
         self.exp_name = time2str()
+        self.n_tickers = 2000
+        self.n_processes = 32

@@ -7,4 +7,6 @@ seaborn
 plotly
 dash
 tables
-
+pandasgui
+dtale
+tqdm
