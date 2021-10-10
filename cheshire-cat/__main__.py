@@ -2,6 +2,8 @@ import yfinance as yf
 import pandas as pd
 pd.options.plotting.backend = "plotly"
 
+import plotly.graph_objects as go
+
 from tickers.get_tickers import *
 
 from logger import write_data_to_hdf5
@@ -28,11 +30,21 @@ def main():
             tickers_df = pd.concat(frames, axis=1)
 
     tickers_df = tickers_df.T
-    tickers_df = tickers_df.set_index('symbol')
-    print(tickers_df)
+    df = tickers_df.set_index('symbol')
+    df = df.T
+    print(df.keys())
 
-    # fig = infos_df.plot.barh()
-    # fig.show()
+    fig = go.Figure(data=[go.Table(
+            header=dict(values=list(df.columns),
+                        fill_color='paleturquoise',
+                        align='left',
+                        ),
+            cells=dict(values=df.transpose().values.tolist(),
+                       fill_color='lavender',
+                       align='left'))
+    ])
+
+    fig.show()
 
     # Log data
     write_data_to_hdf5(tickers_df, param.exp_name)
