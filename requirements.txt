@@ -1,9 +1,8 @@
 yfinance
-fix-yahoo-finance==0.1.30
+fix-yahoo-finance
 numpy
 pandas
 matplotlib
 seaborn
 plotly
 dash
-get-all-tickers
