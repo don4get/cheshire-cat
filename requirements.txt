@@ -1,0 +1,8 @@
+yfinance
+fix-yahoo-finance==0.1.30
+numpy
+pandas
+matplotlib
+seaborn
+plotly
+dash
