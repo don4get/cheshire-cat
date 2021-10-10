@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 from enum import Enum
 import io
@@ -88,7 +90,7 @@ def get_biggest_n_tickers(top_n, sectors=None):
     for exchange in _EXCHANGE_LIST:
         temp = __exchange2df(exchange)
         df = pd.concat([df, temp])
-        
+
     df = df.dropna(subset={'marketCap'})
     df = df[~df['symbol'].str.contains("\.|\^")]
 
@@ -106,7 +108,12 @@ def get_biggest_n_tickers(top_n, sectors=None):
         elif 'B' in mkt_cap:
             return float(mkt_cap[1:-1]) * 1000
         else:
-            return float(mkt_cap[1:]) / 1e6
+            try:
+                mkt_cap_float = float(mkt_cap[1:]) / 1e6
+            except ValueError as e:
+                logging.info(e)
+                mkt_cap_float = 0.
+            return mkt_cap_float
     df['marketCap'] = df['marketCap'].apply(cust_filter)
 
     df = df.sort_values('marketCap', ascending=False)
