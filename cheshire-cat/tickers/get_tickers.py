@@ -1,5 +1,3 @@
-import logging
-
 import pandas as pd
 from enum import Enum
 import io
@@ -8,10 +6,9 @@ import requests
 _EXCHANGE_LIST = ['nyse', 'nasdaq', 'amex']
 
 _SECTORS_LIST = set(['Consumer Non-Durables', 'Capital Goods', 'Health Care',
-       'Energy', 'Technology', 'Basic Industries', 'Finance',
-       'Consumer Services', 'Public Utilities', 'Miscellaneous',
-       'Consumer Durables', 'Transportation'])
-
+                     'Energy', 'Technology', 'Basic Industries', 'Finance',
+                     'Consumer Services', 'Public Utilities', 'Miscellaneous',
+                     'Consumer Durables', 'Transportation'])
 
 # headers and params used to bypass NASDAQ's anti-scraping mechanism in function __exchange2df
 headers = {
@@ -26,6 +23,7 @@ headers = {
     'accept-language': 'en-US,en;q=0.9',
 }
 
+
 def params(exchange):
     return (
         ('letter', '0'),
@@ -33,12 +31,14 @@ def params(exchange):
         ('download', 'true'),
     )
 
+
 def params_region(region):
     return (
         ('letter', '0'),
         ('region', region),
         ('download', 'true'),
     )
+
 
 # I know it's weird to have Sectors as constants, yet the Regions as enums, but
 # it makes the most sense to me
@@ -51,6 +51,7 @@ class Region(Enum):
     SOUTH_AMERICA = 'SOUTH+AMERICA'
     MIDDLE_EAST = 'MIDDLE+EAST'
     NORTH_AMERICA = 'NORTH+AMERICA'
+
 
 class SectorConstants:
     NON_DURABLE_GOODS = 'Consumer Non-Durables'
@@ -81,7 +82,8 @@ def get_tickers(NYSE=True, NASDAQ=True, AMEX=True):
 def get_tickers_filtered(mktcap_min=None, mktcap_max=None, sectors=None):
     tickers_list = []
     for exchange in _EXCHANGE_LIST:
-        tickers_list.extend(__exchange2list_filtered(exchange, mktcap_min=mktcap_min, mktcap_max=mktcap_max, sectors=sectors))
+        tickers_list.extend(
+            __exchange2list_filtered(exchange, mktcap_min=mktcap_min, mktcap_max=mktcap_max, sectors=sectors))
     return tickers_list
 
 
@@ -108,12 +110,8 @@ def get_biggest_n_tickers(top_n, sectors=None):
         elif 'B' in mkt_cap:
             return float(mkt_cap[1:-1]) * 1000
         else:
-            try:
-                mkt_cap_float = float(mkt_cap[1:]) / 1e6
-            except ValueError as e:
-                logging.info(e)
-                mkt_cap_float = 0.
-            return mkt_cap_float
+            return float(mkt_cap[1:]) / 1e6
+
     df['marketCap'] = df['marketCap'].apply(cust_filter)
 
     df = df.sort_values('marketCap', ascending=False)
@@ -133,17 +131,20 @@ def get_tickers_by_region(region):
     else:
         raise ValueError('Please enter a valid region (use a Region.REGION as the argument, e.g. Region.AFRICA)')
 
+
 def __exchange2df(exchange):
     r = requests.get('https://api.nasdaq.com/api/screener/stocks', headers=headers, params=params(exchange))
     data = r.json()['data']
     df = pd.DataFrame(data['rows'], columns=data['headers'])
     return df
 
+
 def __exchange2list(exchange):
     df = __exchange2df(exchange)
     # removes weird tickers
     df_filtered = df[~df['symbol'].str.contains("\.|\^")]
     return df_filtered['symbol'].tolist()
+
 
 # market caps are in millions
 def __exchange2list_filtered(exchange, mktcap_min=None, mktcap_max=None, sectors=None):
@@ -168,6 +169,7 @@ def __exchange2list_filtered(exchange, mktcap_min=None, mktcap_max=None, sectors
             return 0.0
         else:
             return float(mkt_cap[1:]) / 1e6
+
     df['marketCap'] = df['marketCap'].apply(cust_filter)
     if mktcap_min is not None:
         df = df[df['marketCap'] > mktcap_min]
@@ -182,6 +184,7 @@ def save_tickers(NYSE=True, NASDAQ=True, AMEX=True, filename='tickers.csv'):
     df = pd.DataFrame(tickers2save)
     df.to_csv(filename, header=False, index=False)
 
+
 def save_tickers_by_region(region, filename='tickers_by_region.csv'):
     tickers2save = get_tickers_by_region(region)
     df = pd.DataFrame(tickers2save)
@@ -189,7 +192,6 @@ def save_tickers_by_region(region, filename='tickers_by_region.csv'):
 
 
 if __name__ == '__main__':
-
     # tickers of all exchanges
     tickers = get_tickers()
     print(tickers[:5])
@@ -225,4 +227,3 @@ if __name__ == '__main__':
     # get tickers of 5 largest companies by market cap (specify sectors=SECTOR)
     top_5 = get_biggest_n_tickers(5)
     print(top_5)
-

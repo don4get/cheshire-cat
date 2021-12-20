@@ -1,0 +1,19 @@
+fcf growth
+fcf/share
+net cash / debt
+fcf margin
+peg ratio
+ev/sales
+ev/ebitda
+fcf yield
+buyback yield
+short/float
+short/shares
+roic
+roa
+roe
+bid size
+ask size
+market cap
+payout ratio
+split effect

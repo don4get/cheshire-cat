@@ -10,3 +10,4 @@ tables
 pandasgui
 dtale
 tqdm
+pytickersymbols
