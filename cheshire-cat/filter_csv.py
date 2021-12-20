@@ -4,16 +4,17 @@ import pandas as pd
 def filter_csv(filename):
     df = pd.read_csv(filename)
 
-    df = keep_companies_with_safe_fundamentals(df)
+    df = keep_companies_with_safe_metrics(df)
 
     df.dropna(axis=1, how="all", thresh=None, subset=None, inplace=True)
     df = df.sort_values(by=["symbol"])
 
-    df.to_csv("data/metrics/filtered_fundamentals_stockanalysis.csv")
+    df.to_csv("data/metrics/filtered_metrics_stockanalysis.csv")
 
     return df
 
-def keep_companies_with_safe_fundamentals(df):
+
+def keep_companies_with_safe_metrics(df):
     df = df[df.shortRatio < 3]  # https://www.fool.com/knowledge-center/what-is-a-short-ratio.aspx
     df = df[df.pegRatio < 1.5]  # < 1 https://www.investopedia.com/terms/p/pegratio.asp
     df = df[
@@ -24,4 +25,4 @@ def keep_companies_with_safe_fundamentals(df):
 
 
 if __name__ == "__main__":
-    filter_csv("../data/metrics/fundamentals_stockanalysis.csv")
+    filter_csv("../data/metrics/metrics_stockanalysis.csv")
