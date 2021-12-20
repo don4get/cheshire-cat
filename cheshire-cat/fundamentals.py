@@ -15,7 +15,7 @@ def get_ticker(ticker):
 def get_metrics(output_filepath):
     param = Param()
     # ticker_names = get_tickers()
-    ticker_names = pd.read_csv('cheshire-cat/tickers/tickers_stockanalysis.csv')
+    ticker_names = pd.read_csv('tickers/tickers_stockanalysis.csv')
     ticker_names = [v[0] for v in ticker_names.values]
     print(ticker_names)
     with Pool(processes=param.n_processes) as p:
