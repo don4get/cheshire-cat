@@ -3,13 +3,12 @@ import pandas as pd
 
 def filter_csv(filename):
     df = pd.read_csv(filename)
-
     df = keep_companies_with_safe_metrics(df)
 
     df.dropna(axis=1, how="all", thresh=None, subset=None, inplace=True)
     df = df.sort_values(by=["symbol"])
 
-    df.to_csv("data/metrics/filtered_metrics_stockanalysis.csv")
+    df.to_csv("../data/metrics/filtered_metrics_stockanalysis.csv")
 
     return df
 

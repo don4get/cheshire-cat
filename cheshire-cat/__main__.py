@@ -1,4 +1,4 @@
-from fundamentals import get_metrics
+from metrics import get_metrics
 from filter_csv import filter_csv
 from plotter import plot_metrics
 import os.path
@@ -14,6 +14,7 @@ def main():
     # Filter the metrics to
     df = filter_csv(metrics_filepath)
 
+    # Plot metrics
     plot_metrics(df)
 
 
