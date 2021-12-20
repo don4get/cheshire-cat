@@ -1,6 +1,7 @@
 from metrics import get_metrics
-from filter_csv import filter_csv
-from plotter import plot_metrics
+from filter import filter_metrics
+from plotter import plot_metrics, plot_scatter
+
 import os.path
 
 metrics_filepath = "../data/metrics/metrics_stockanalysis.csv"
@@ -12,11 +13,11 @@ def main():
         get_metrics(metrics_filepath)
 
     # Filter the metrics to
-    df = filter_csv(metrics_filepath)
+    df = filter_metrics(metrics_filepath)
 
-    # Plot metrics
-    plot_metrics(df)
+    plot_metrics(df, dtale_format=False)
 
+    plot_scatter(df)
 
 if __name__ == '__main__':
     main()
