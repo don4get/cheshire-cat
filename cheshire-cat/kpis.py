@@ -271,30 +271,8 @@ if __name__ == "__main__":
 
     new_columns = {k : camel_to_snake(k) for k in financial_df.columns}
     financial_df = financial_df.rename(columns=new_columns)
-    # for c in bs_df.columns:
-    #     print(c)
-
-    # cf_df: DataFrame = y_ticker.cashflow
-    # financial_df: DataFrame = y_ticker.financials
-    # earnings_df: DataFrame = y_ticker.earnings
-
-    # qbs_df: DataFrame = y_ticker.quarterly_balancesheet
-    # bs_df = merge_df_with_qdf(bs_df, qbs_df)
-    # qcf_df: DataFrame = y_ticker.quarterly_cashflow
-    # cf_df = merge_df_with_qdf(cf_df, qcf_df)
-    # qfinancial_df: DataFrame = y_ticker.quarterly_financials
-    # financial_df = merge_df_with_qdf(financial_df, qfinancial_df)
-    # qearnings_df: DataFrame = y_ticker.quarterly_earnings
-    # earnings_df = merge_df_with_qdf(earnings_df, qearnings_df)
-
-    # full_df = bs_df.append([cf_df, financial_df])
-
-    # date = bs_df.columns[0]
-    # full_series: Series = full_df.iloc[:, -1]
     info = y_ticker.info
 
-    # for k in info.keys():
-    #     print(k)
 
     kpis = Kpis(ticker, financial_df, info)
     kpis_df = kpis.to_df()
