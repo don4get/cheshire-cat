@@ -11,3 +11,4 @@ pandasgui
 dtale
 tqdm
 pytickersymbols
+sqlalchemy
