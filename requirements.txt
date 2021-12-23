@@ -12,3 +12,7 @@ dtale
 tqdm
 pytickersymbols
 sqlalchemy
+yahooquery
+currencyconverter
+cryptography
+pymysql

@@ -2,16 +2,24 @@
 """
 kpi.py module containing :class:`~cheshire-cat.kpi.py.<ClassName>` class.
 """
+import logging
+import random
+
+import numpy as np
 import yfinance as yf
 import yahooquery as yq
 from pandas import DataFrame, Series
 import pandas as pd
+
+from proxy import get_proxies
 from utils import camel_to_snake
 from numpy import NaN
 
 class Kpis():
     def __init__(self, ticker, df: DataFrame, info):
         index = df.index
+        self.as_of_date = df.index.to_series()
+        self.symbol = Series(data=[NaN for _ in index], index=index)
         self.period_type = Series(data=[NaN for _ in index], index=index)
         self.currency_code = Series(data=[NaN for _ in index], index=index)
         self.accounts_payable = Series(data=[NaN for _ in index], index=index)
@@ -169,13 +177,26 @@ class Kpis():
         self.working_capital = Series(data=[NaN for _ in index], index=index)
 
         for c in df.columns:
-            self.__dict__[c] = df[c]
+            if c in self.__dict__.keys():
+                self.__dict__[c] = df[c]
 
         if not self.ebit.all():
             self.ebit = self.operating_income
 
-        self.two_hundred_day_avg_share_price = info["twoHundredDayAverage"]
-        self.shares_outstanding = info["sharesOutstanding"]
+
+
+        try:
+            self.two_hundred_day_avg_share_price = info[ticker]["twoHundredDayAverage"]
+        except TypeError as e:
+            logging.warning("Info misses two hundred day average.")
+            logging.warning(e)
+            self.two_hundred_day_avg_share_price = NaN
+        try:
+            self.shares_outstanding = info[ticker]["sharesOutstanding"]
+        except TypeError as e:
+            logging.warning("Info misses two hundred day average.")
+            logging.warning(e)
+            self.shares_outstanding = NaN
 
         self.total_liabilities = self.total_liabilities_net_minority_interest
 
@@ -208,6 +229,24 @@ class Kpis():
         self.debt_ratio = self.total_debt / self.total_assets
 
         self.debt_service = self.total_debt.diff() + self.interest_expense
+
+        self.debt_service_coverage_ratio = self.net_income / self.debt_service
+
+        self.earnings_per_share = self.net_income / self.shares_outstanding
+
+        self.return_on_capital_employed = self.ebit / (self.total_assets - self.current_liabilities)
+
+        self.return_on_equity = self.net_income / self.stockholders_equity
+
+        self.return_on_assets = self.net_income / self.total_assets
+
+        self.return_on_net_assets = self.net_income / self.net_tangible_assets
+
+        self.free_cash_flow_per_share = self.free_cash_flow / self.shares_outstanding
+
+        self.price_to_free_cash_flow = self.two_hundred_day_avg_share_price / self.free_cash_flow
+
+        self.enterprise_value = self.market_value + self.total_debt
 
     def quick_ratio(self):
         """
@@ -249,10 +288,12 @@ class Kpis():
 
     def to_df(self):
         frame = {k:self.__dict__[k] for k in self.__dict__.keys()}
-        return DataFrame(frame)
+        frame = DataFrame(frame)
+        frame.replace([np.inf, -np.inf], np.nan, inplace=True)
+        return frame
 
 
-def merge_df_with_qdf(df, qdf):
+def merge_df_with_qdf(df: DataFrame, qdf:DataFrame):
     columns_to_keep_in_qdf = qdf.columns.difference(df.columns)
     df = pd.merge(df, qdf[columns_to_keep_in_qdf], how="left",
              left_index=True, right_index=True)
@@ -263,20 +304,34 @@ def merge_df_with_qdf(df, qdf):
 
 
 if __name__ == "__main__":
-    ticker = "MC"
-    y_ticker: yf.Ticker = yf.Ticker(ticker)
+    ticker = "AAPL"
+    # y_ticker: yf.Ticker = yf.Ticker(ticker)
+    # proxies = get_proxies()
+    # plist = random.sample(proxies, len(proxies))
+    # pdict = {
+    #     "http": "http://"+plist[0],
+    #     "https": "http://"+plist[0]
+    # }
     yq_ticker: yq.Ticker = yq.Ticker(ticker)
     financial_df = yq_ticker.all_financial_data("a")
+    if not isinstance(financial_df, DataFrame):
+        print("Blacklisted...")
+
+    financial_df["symbol"] = financial_df.index
     financial_df = financial_df.set_index("asOfDate")
 
     new_columns = {k : camel_to_snake(k) for k in financial_df.columns}
     financial_df = financial_df.rename(columns=new_columns)
-    info = y_ticker.info
+    quotes_info = yq_ticker.quotes
+    # hist_df = yq_ticker.history("5y", "1d")
+    # splitted_index = hist_df.index.str.split("/")
+    # hist_df["symbol"] = splitted_index[0]
+    # hist_df["date"] = splitted_index[1]
+    # hist_df.set_index("date")
+    # hist_df['two_hundred_average'] = hist_df.rolling(window=200).mean()
 
 
-    kpis = Kpis(ticker, financial_df, info)
+    kpis = Kpis(ticker, financial_df, quotes_info)
     kpis_df = kpis.to_df()
-    #
     print(kpis_df)
 
-    print(kpis)

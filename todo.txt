@@ -1,0 +1,2 @@
+* Use currencyconverter package to be able to convert everything in USD
+* Use share_purchase activity from yahooquery
