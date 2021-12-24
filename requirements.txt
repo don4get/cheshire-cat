@@ -16,4 +16,4 @@ yahooquery
 currencyconverter
 cryptography
 pymysql
-black
+
