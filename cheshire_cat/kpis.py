@@ -365,7 +365,14 @@ def get_kpis():
             finally:
                 ticker_df.to_sql('kpis', con=connection, if_exists='append', index=False)
 
+def get_kpis_from_sql(symbol):
+    engine = create_engine('mysql+pymysql://cat:meow@localhost/cheshire-cat-db')
+    with engine.begin() as connection:
+        req = f"SELECT * FROM kpis WHERE symbol= '{symbol}';"
+        df = pd.read_sql_query(req,
+                               connection)
 
+    return df
 
 
 if __name__ == "__main__":
