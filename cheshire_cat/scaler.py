@@ -13,7 +13,7 @@ from cheshire_cat.kpis import get_kpis_from_sql
 
 
 def compute_average_history_for_symbol(symbol, period=120):
-    engine = create_engine('mysql+pymysql://cat:meow@localhost/cheshire-cat-db')
+    engine = create_engine("mysql+pymysql://cat:meow@localhost/cheshire-cat-db")
 
     history_df: DataFrame = get_history_from_sql(symbol)
     print(history_df)
@@ -32,10 +32,11 @@ def compute_average_history_for_symbol(symbol, period=120):
 
 
 def compute_average_history():
-    ticker_names = pd.read_csv('tickers/tickers_stockanalysis_small.csv')
+    ticker_names = pd.read_csv("tickers/tickers_stockanalysis_small.csv")
 
     for t in ticker_names:
         compute_average_history_for_symbol(t)
+
 
 if __name__ == "__main__":
     symbol = "MSFT"
