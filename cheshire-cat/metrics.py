@@ -34,7 +34,7 @@ def get_ticker(ticker):
         return None
     financial_df["symbol"] = financial_df.index
     financial_df = financial_df.set_index("asOfDate")
-    new_columns = {k : camel_to_snake(k) for k in financial_df.columns}
+    new_columns = {k: camel_to_snake(k) for k in financial_df.columns}
     financial_df = financial_df.rename(columns=new_columns)
 
     quotes_info = yq_ticker.quotes
@@ -43,10 +43,11 @@ def get_ticker(ticker):
 
     return kpis_df
 
+
 def get_metrics(output_filepath):
     param = Param()
     # ticker_names = get_tickers()
-    ticker_names = pd.read_csv('tickers/tickers_stockanalysis.csv')
+    ticker_names = pd.read_csv("tickers/tickers_stockanalysis.csv")
     ticker_names = [v[0] for v in ticker_names.values]
     # print(ticker_names)
     # with Pool(processes=param.n_processes) as p:
@@ -54,7 +55,7 @@ def get_metrics(output_filepath):
 
     # tickers = [t for t in tickers if t is not None]
 
-    engine = create_engine('mysql+pymysql://cat:meow@localhost/cheshire-cat-db')
+    engine = create_engine("mysql+pymysql://cat:meow@localhost/cheshire-cat-db")
 
     try:
         with engine.begin() as connection:
@@ -83,9 +84,10 @@ def get_metrics(output_filepath):
             except ValueError as ve:
                 warnings.warn("Table not found")
             finally:
-                ticker_df.to_sql('kpis', con=connection, if_exists='append', index=False)
+                ticker_df.to_sql(
+                    "kpis", con=connection, if_exists="append", index=False
+                )
             # tickers.append(ticker_df)
-
 
     # tickers_df = pd.concat(tickers, axis=0)
     # tickers_df = tickers_df.T.set_index('symbol')

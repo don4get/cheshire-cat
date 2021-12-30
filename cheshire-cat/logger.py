@@ -4,12 +4,12 @@ import os
 data_path = os.path.join(os.path.dirname(__file__), "../data")
 
 extension = {
-    "log": '.hdf5',
-    "param": '.pickle',
-    "plot": '.pdf',
-    "image": '.jpg',
-    "video": '.mp4',
-    "csv": '.csv'
+    "log": ".hdf5",
+    "param": ".pickle",
+    "plot": ".pdf",
+    "image": ".jpg",
+    "video": ".mp4",
+    "csv": ".csv",
 }
 
 
@@ -28,7 +28,7 @@ def write_data_to_hdf5(df, file_name="test", write_mode="w"):
     filepath = log_pather(file_name)
 
     try:
-        df.to_hdf(filepath, key='df', mode=write_mode)
+        df.to_hdf(filepath, key="df", mode=write_mode)
 
     except PermissionError:
         traceback.print_exc()
@@ -44,13 +44,13 @@ def log_pather(file_name=None):
     Returns:
         path, the path created
     """
-    path = os.path.join(data_path, 'logs')
+    path = os.path.join(data_path, "logs")
     path = pather(path)
     if not file_name:
         return path
 
-    if file_name.find('.') == -1:
-        file_name += extension['log']
+    if file_name.find(".") == -1:
+        file_name += extension["log"]
     return os.path.join(path, file_name)
 
 
@@ -66,7 +66,7 @@ def pather(path):
     """
     if not os.path.exists(path):
         os.makedirs(path)
-    path = path + '/'
+    path = path + "/"
     if not os.path.exists(path):
         os.makedirs(path)
     return path

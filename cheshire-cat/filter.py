@@ -16,13 +16,18 @@ def filter_metrics(filename):
 
 
 def keep_companies_with_safe_metrics(df):
-    df = df[df.shortRatio < 3]  # https://www.fool.com/knowledge-center/what-is-a-short-ratio.aspx
+    df = df[
+        df.shortRatio < 3
+    ]  # https://www.fool.com/knowledge-center/what-is-a-short-ratio.aspx
     df = df[df.pegRatio < 1.5]  # < 1 https://www.investopedia.com/terms/p/pegratio.asp
     df = df[
-        df.payoutRatio < 0.6]  # http://www.objectifrente.com/actions/comprendre-et-utiliser-le-payout-ratio-comme-critere-dinvestissement
+        df.payoutRatio < 0.6
+    ]  # http://www.objectifrente.com/actions/comprendre-et-utiliser-le-payout-ratio-comme-critere-dinvestissement
     df = df[
-        df.debtToEquity < 200]  # https://www.investopedia.com/terms/d/debtequityratio.asp#:~:text=%2FE)%20Ratio%3F-,The%20debt%2Dto%2Dequity%20(D%2FE)%20ratio,metric%20used%20in%20corporate%20finance.
+        df.debtToEquity < 200
+    ]  # https://www.investopedia.com/terms/d/debtequityratio.asp#:~:text=%2FE)%20Ratio%3F-,The%20debt%2Dto%2Dequity%20(D%2FE)%20ratio,metric%20used%20in%20corporate%20finance.
     return df
+
 
 def reorder_columns(df):
     # move_column
@@ -31,34 +36,34 @@ def reorder_columns(df):
     df = df.reindex(cols, axis=1)
 
     # delete_column
-    df = df.drop('address2', axis=1)
+    df = df.drop("address2", axis=1)
 
     # delete_column
-    df = df.drop('uuid', axis=1)
+    df = df.drop("uuid", axis=1)
 
     # delete_column
-    df = df.drop('companyOfficers', axis=1)
+    df = df.drop("companyOfficers", axis=1)
 
     # delete_column
-    df = df.drop('maxAge', axis=1)
+    df = df.drop("maxAge", axis=1)
 
     # delete_column
-    df = df.drop('tradeable', axis=1)
+    df = df.drop("tradeable", axis=1)
 
     # delete_column
-    df = df.drop('fax', axis=1)
+    df = df.drop("fax", axis=1)
 
     # delete_column
-    df = df.drop('messageBoardId', axis=1)
+    df = df.drop("messageBoardId", axis=1)
 
     # delete_column
-    df = df.drop('quoteType', axis=1)
+    df = df.drop("quoteType", axis=1)
 
     # delete_column
-    df = df.drop('gmtOffSetMilliseconds', axis=1)
+    df = df.drop("gmtOffSetMilliseconds", axis=1)
 
     # delete_column
-    df = df.drop('isEsgPopulated', axis=1)
+    df = df.drop("isEsgPopulated", axis=1)
 
     # move_column
     cols = list(df.columns)
@@ -166,7 +171,7 @@ def reorder_columns(df):
     df = df.reindex(cols, axis=1)
 
     # sort_column
-    df = df.sort_values('recommendationMean', ascending=True, kind='mergesort')
+    df = df.sort_values("recommendationMean", ascending=True, kind="mergesort")
 
     return df
 
