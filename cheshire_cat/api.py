@@ -59,10 +59,11 @@ def create_app(database_url: str | None = None):
         prices = data["prices"]
         facts = latest_fundamentals(data["fundamentals"])
         valuation = portfolio_valuation(data)
+        tracked_symbols = set(universe_symbols)
         symbols = sorted(
-            set(universe_symbols)
-            | set(price_symbols)
-            | set(prices.get("symbol", pd.Series(dtype=str)).dropna())
+            tracked_symbols
+            | (set(price_symbols) & tracked_symbols)
+            | (set(prices.get("symbol", pd.Series(dtype=str)).dropna()) & tracked_symbols)
         )
         return {
             "symbols": symbols,
