@@ -185,28 +185,118 @@ def ingest_fundamentals(
         for symbol in dict.fromkeys(s.strip().upper() for s in symbols if s.strip()):
             cik, payload = client.company_facts(symbol)
             rows = extract_company_facts(payload, symbol, cik, forms, filed_year)
-            inserted = 0
-            for values in rows:
-                existing = session.scalar(
-                    select(FundamentalFact).where(
-                        FundamentalFact.symbol == values["symbol"],
-                        FundamentalFact.taxonomy == values["taxonomy"],
-                        FundamentalFact.concept == values["concept"],
-                        FundamentalFact.unit == values["unit"],
-                        FundamentalFact.period_end == values["period_end"],
-                        FundamentalFact.filed == values["filed"],
-                        FundamentalFact.form == values["form"],
-                    )
-                )
-                if existing is None:
-                    session.add(FundamentalFact(**values))
-                else:
-                    for key, value in values.items():
-                        setattr(existing, key, value)
-                inserted += 1
-            session.commit()
-            result[symbol] = inserted
+            result[symbol] = _upsert_fundamentals(session, rows)
     return result
+
+
+def _upsert_fundamentals(
+    session: Session,
+    rows: list[dict[str, Any]],
+    update_existing: bool = True,
+) -> int:
+    """Bulk-upsert observations while preserving the source values exactly."""
+
+    if not rows:
+        return 0
+
+    # SEC company-facts can repeat an observation in a single response. Keep
+    # the last copy before sending rows to the database's unique constraint.
+    unique_columns = (
+        "symbol",
+        "taxonomy",
+        "concept",
+        "unit",
+        "period_end",
+        "filed",
+        "form",
+    )
+    deduplicated = {
+        tuple(row[column] for column in unique_columns): row
+        for row in rows
+    }
+    values = list(deduplicated.values())
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:
+        for row in values:
+            existing = session.scalar(
+                select(FundamentalFact).where(
+                    *(getattr(FundamentalFact, column) == row[column] for column in unique_columns)
+                )
+            )
+            if existing is None:
+                session.add(FundamentalFact(**row))
+            else:
+                for key, value in row.items():
+                    setattr(existing, key, value)
+        session.commit()
+        return len(values)
+
+    if dialect == "postgresql" and not update_existing:
+        return _copy_fundamentals(session, values, unique_columns)
+
+    # Keep statements comfortably below PostgreSQL's parameter limit for the
+    # largest company-facts payloads (12 columns x 4,000 rows = 48,000 params).
+    table = FundamentalFact.__table__
+    chunk_size = 4000
+    if update_existing:
+        for offset in range(0, len(values), chunk_size):
+            chunk = values[offset : offset + chunk_size]
+            statement = insert(table).values(chunk)
+            update = {
+                key: getattr(statement.excluded, key)
+                for key in chunk[0]
+                if key not in unique_columns
+            }
+            session.execute(
+                statement.on_conflict_do_update(
+                    index_elements=list(unique_columns),
+                    set_=update,
+                )
+            )
+    else:
+        for offset in range(0, len(values), chunk_size):
+            chunk = values[offset : offset + chunk_size]
+            statement = insert(table).values(chunk).on_conflict_do_nothing(
+                index_elements=list(unique_columns)
+            )
+            session.execute(statement)
+    session.commit()
+    return len(values)
+
+
+def _copy_fundamentals(
+    session: Session,
+    values: list[dict[str, Any]],
+    unique_columns: tuple[str, ...],
+) -> int:
+    """Load a fresh company-facts payload through PostgreSQL COPY."""
+
+    columns = tuple(values[0])
+    column_sql = ",".join(columns)
+    table = FundamentalFact.__table__
+    connection = session.connection()
+    driver = connection.connection.driver_connection
+    with driver.cursor() as cursor:
+        cursor.execute(
+            "CREATE TEMP TABLE fundamental_facts_stage "
+            "(LIKE fundamental_facts INCLUDING DEFAULTS) ON COMMIT DROP"
+        )
+        with cursor.copy(
+            f"COPY fundamental_facts_stage ({column_sql}) FROM STDIN"
+        ) as copy:
+            for row in values:
+                copy.write_row(tuple(row[column] for column in columns))
+        cursor.execute(
+            f"INSERT INTO {table.name} ({column_sql}) "
+            f"SELECT {column_sql} FROM fundamental_facts_stage "
+            f"ON CONFLICT ({','.join(unique_columns)}) DO NOTHING"
+        )
+    session.commit()
+    return len(values)
 
 
 def document_to_markdown(content: bytes | str, source_suffix: str = ".html") -> str:
@@ -240,11 +330,11 @@ def archive_filing(
     suffix: str,
     output_dir: Path | None = None,
     database_url: str | None = None,
+    engine=None,
 ) -> FinancialReport:
     """Write original and Markdown files and upsert their catalog row."""
 
     root = output_dir or settings.reports_dir
-    create_schema(database_url)
     folder = root / filing.symbol / str(filing.filing_date.year)
     folder.mkdir(parents=True, exist_ok=True)
     safe_accession = filing.accession_number.replace("-", "")
@@ -254,8 +344,8 @@ def archive_filing(
     markdown.write_text(document_to_markdown(content, suffix), encoding="utf-8")
     digest = hashlib.sha256(content).hexdigest()
 
-    engine = get_engine(database_url)
-    with Session(engine) as session:
+    database_engine = engine or get_engine(database_url)
+    with Session(database_engine) as session:
         record = session.scalar(
             select(FinancialReport).where(
                 FinancialReport.symbol == filing.symbol,
@@ -297,6 +387,7 @@ def ingest_reports(
     """Discover, download and archive annual/quarterly filings for each symbol."""
 
     client = client or SecFilingsClient()
+    create_schema(database_url)
     result: dict[str, int] = {}
     for symbol in dict.fromkeys(s.strip().upper() for s in symbols if s.strip()):
         total = 0
