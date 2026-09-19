@@ -133,6 +133,8 @@ class FrenchPeaUniverseSource:
             if len(values) < 3:
                 continue
             name, isin, symbol = values[:3]
+            if _is_non_equity_instrument(name):
+                continue
             currency = values[4].split()[0] if len(values) > 4 and values[4] else "EUR"
             if not symbol or not isin:
                 continue
@@ -303,6 +305,10 @@ def _primary_market_code(row: Any) -> str | None:
 
 def _parse_bool(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "oui", "eligible"}
+
+
+def _is_non_equity_instrument(name: str) -> bool:
+    return bool(re.search(r"\b(?:BSA\d*|WARR(?:ANT)?S?)\b", name.upper()))
 
 
 def _integer(value: Any) -> int:

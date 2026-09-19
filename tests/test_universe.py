@@ -85,6 +85,19 @@ def test_euronext_primary_market_maps_yahoo_suffix():
     assert euronext.fetch()[0].symbol == "ABO.BR"
 
 
+def test_euronext_parser_excludes_warrants_from_stock_universe():
+    euronext = FrenchPeaUniverseSource(
+        session=Session(
+            {
+                "aaData": [
+                    ["Casino BSA1", "FR001400OJ72", "COBS1", "Euronext Paris", "EUR"]
+                ]
+            }
+        )
+    )
+    assert euronext.fetch() == []
+
+
 def test_proxy_pool_retires_bad_endpoints():
     pool = ProxyPool(["1.1.1.1:80", "2.2.2.2:80"], max_failures=1)
     first = pool.next()
