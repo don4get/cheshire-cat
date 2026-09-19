@@ -1,12 +1,12 @@
 import dtale
-from pandasgui import show
 import plotly.express as px
+from pandasgui import show
 
 
 def plot_metrics(df, dtale_format=True):
     df = df.sort_values(by=["beta"])
     if dtale_format:
-        d = dtale.show(df, subprocess=False)
+        dtale.show(df, subprocess=False)
     else:
         show(df)
 

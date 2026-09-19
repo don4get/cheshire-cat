@@ -1,5 +1,5 @@
-from datetime import datetime
 import re
+from datetime import UTC, datetime
 
 
 def time2str():
@@ -9,7 +9,7 @@ def time2str():
     Returns:
         time_string, a string of the current time
     """
-    time_now = datetime.now()
+    time_now = datetime.now(UTC)
     time_string = time_now.strftime("%Y-%m-%d-%H-%M-%S")
     return time_string
 

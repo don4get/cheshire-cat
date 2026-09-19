@@ -1,4 +1,4 @@
-from utils import time2str
+from .utils import time2str
 
 
 class Param:

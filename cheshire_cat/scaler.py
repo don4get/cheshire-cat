@@ -1,20 +1,17 @@
-# -*- coding: utf-8 -*-
 """
 scaler.py module containing :class:`~cheshire-cat.scaler.py.<ClassName>` class.
 """
 
+from datetime import datetime
+
 import pandas as pd
 from pandas import DataFrame
-from sqlalchemy import create_engine
-from datetime import datetime
 
 from cheshire_cat.history import get_history_from_sql
 from cheshire_cat.kpis import get_kpis_from_sql
 
 
 def compute_average_history_for_symbol(symbol, period=120):
-    engine = create_engine("mysql+pymysql://cat:meow@localhost/cheshire-cat-db")
-
     history_df: DataFrame = get_history_from_sql(symbol)
     print(history_df)
     # with engine.begin() as connection:

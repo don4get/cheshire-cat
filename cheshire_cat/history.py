@@ -1,47 +1,60 @@
-# -*- coding: utf-8 -*-
-"""
-history.py module containing :class:`~cheshire-cat.history.py.<ClassName>` class.
-"""
+"""Backward-compatible entry points for historical price storage."""
 
-from tqdm import tqdm
-from sqlalchemy import create_engine
+from __future__ import annotations
+
+from datetime import date
+
 import pandas as pd
-import yahooquery as yq
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .database import Price, create_schema, get_engine
+from .market_data import YFinanceProvider, ingest_history
 
 
-def get_ticker(ticker):
-    yq_ticker: yq.Ticker = yq.Ticker(ticker)
-    hist_df = yq_ticker.history("max", "1d")
-    splitted_index_df = hist_df.index.to_frame()
-    hist_df = pd.concat([hist_df, splitted_index_df], axis=1)
+def get_ticker(ticker: str) -> pd.DataFrame:
+    """Fetch one ticker without writing it to the database."""
 
-    return hist_df
+    return YFinanceProvider().history(ticker, None, None, "1d").reset_index()
 
 
-def get_history():
-    engine = create_engine("mysql+pymysql://cat:meow@localhost/cheshire-cat-db")
-    ticker_names = pd.read_csv("tickers/tickers_stockanalysis.csv")
-    ticker_names = [v[0] for v in ticker_names.values]
+def get_history(
+    symbols: list[str] | None = None,
+    start: str | date | None = None,
+    end: str | date | None = None,
+    database_url: str | None = None,
+):
+    """Download and store history; symbols default to the bundled ticker file."""
 
-    for t in tqdm(ticker_names):
-        ticker_df = get_ticker(t)
-        if ticker_df is None:
-            print(f"{t} went wrong.")
-            continue
-        with engine.begin() as connection:
-            ticker_df.to_sql("values", con=connection, if_exists="append", index=False)
+    if symbols is None:
+        ticker_file = "cheshire_cat/tickers/tickers_stockanalysis.csv"
+        symbols = pd.read_csv(ticker_file).iloc[:, 0].dropna().tolist()
+    create_schema(database_url)
+    return ingest_history(symbols, start, end, database_url=database_url)
 
 
-def get_history_from_sql(symbol):
-    engine = create_engine("mysql+pymysql://cat:meow@localhost/cheshire-cat-db")
-    with engine.begin() as connection:
-        req = f"SELECT * FROM history WHERE symbol= '{symbol}';"
-        df = pd.read_sql_query(req, connection)
-
-    return df
+def get_history_from_sql(symbol: str, database_url: str | None = None) -> pd.DataFrame:
+    engine = get_engine(database_url)
+    with Session(engine) as session:
+        rows = session.scalars(
+            select(Price).where(Price.symbol == symbol.upper()).order_by(Price.date)
+        ).all()
+    return pd.DataFrame(
+        [
+            {
+                "symbol": row.symbol,
+                "date": row.date,
+                "open": row.open,
+                "high": row.high,
+                "low": row.low,
+                "close": row.close,
+                "adj_close": row.adj_close,
+                "volume": row.volume,
+            }
+            for row in rows
+        ]
+    )
 
 
 if __name__ == "__main__":
-    # get_history()
-    df = get_history_from_sql("MSFT")
-    print(df)
+    print(get_history_from_sql("MSFT"))

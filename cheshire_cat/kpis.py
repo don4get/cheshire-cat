@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 kpi.py module containing :class:`~cheshire-cat.kpi.py.<ClassName>` class.
 """
@@ -6,14 +5,15 @@ import logging
 import warnings
 
 import numpy as np
-import yahooquery as yq
-from pandas import DataFrame, Series
 import pandas as pd
+from numpy import NaN
+from pandas import DataFrame, Series
+from sqlalchemy import create_engine
 from tqdm import tqdm
 
-from utils import camel_to_snake
-from numpy import NaN
-from sqlalchemy import create_engine
+from .utils import camel_to_snake
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Kpis:
@@ -284,7 +284,7 @@ class Kpis:
         self.working_capital = Series(data=[NaN for _ in index], index=index)
 
         for c in df.columns:
-            if c in self.__dict__.keys():
+            if c in self.__dict__:
                 self.__dict__[c] = df[c]
 
         if not self.ebit.all():
@@ -293,14 +293,12 @@ class Kpis:
         try:
             self.two_hundred_day_avg_share_price = info[ticker]["twoHundredDayAverage"]
         except (TypeError, KeyError) as e:
-            logging.warning("Info misses two hundred day average.")
-            logging.warning(e)
+            LOGGER.warning("Info misses two hundred day average: %s", e)
             self.two_hundred_day_avg_share_price = NaN
         try:
             self.shares_outstanding = info[ticker]["sharesOutstanding"]
         except (TypeError, KeyError) as e:
-            logging.warning("Info misses shares outstanding.")
-            logging.warning(e)
+            LOGGER.warning("Info misses shares outstanding: %s", e)
             self.shares_outstanding = NaN
 
         self.total_liabilities = self.total_liabilities_net_minority_interest
@@ -404,7 +402,7 @@ class Kpis:
         return self.cash_per_share
 
     def to_df(self):
-        frame = {k: self.__dict__[k] for k in self.__dict__.keys()}
+        frame = {k: self.__dict__[k] for k in self.__dict__}
         frame = DataFrame(frame)
         frame.replace([np.inf, -np.inf], np.nan, inplace=True)
         return frame
@@ -426,7 +424,12 @@ def get_kpis_df(ticker):
     #     "http": "http://"+plist[0],
     #     "https": "http://"+plist[0]
     # }
-    yq_ticker: yq.Ticker = yq.Ticker(ticker)  # proxies=pdict
+    try:
+        import yahooquery as yq
+    except ImportError as exc:
+        raise RuntimeError("Install legacy KPI support with `uv sync --extra all`.") from exc
+
+    yq_ticker = yq.Ticker(ticker)  # proxies=pdict
 
     financial_df = yq_ticker.all_financial_data("a")
     if not isinstance(financial_df, DataFrame):
@@ -461,8 +464,8 @@ def get_kpis():
             df_old = pd.read_sql_table("kpis", connection)
         already_computed_symbols = df_old.symbol.tolist()
         ticker_names = [t for t in ticker_names if t not in already_computed_symbols]
-    except ValueError as e:
-        logging.warning("Table kpis does not exist.")
+    except ValueError:
+        LOGGER.warning("Table kpis does not exist.")
         df_old = DataFrame()
 
     for t in tqdm(ticker_names):
@@ -480,7 +483,7 @@ def get_kpis():
                     WHERE symbol = '{ticker_df.symbol[0]}';
                     """
                     connection.execute(req)
-            except ValueError as ve:
+            except ValueError:
                 warnings.warn("Table not found")
             finally:
                 ticker_df.to_sql(

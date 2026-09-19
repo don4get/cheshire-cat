@@ -1,12 +1,12 @@
-import pandas as pd
-from enum import Enum
 import io
+from enum import Enum
+
+import pandas as pd
 import requests
 
 _EXCHANGE_LIST = ["nyse", "nasdaq", "amex"]
 
-_SECTORS_LIST = set(
-    [
+_SECTORS_LIST = {
         "Consumer Non-Durables",
         "Capital Goods",
         "Health Care",
@@ -19,8 +19,7 @@ _SECTORS_LIST = set(
         "Miscellaneous",
         "Consumer Durables",
         "Transportation",
-    ]
-)
+}
 
 # headers and params used to bypass NASDAQ's anti-scraping mechanism in function __exchange2df
 headers = {
@@ -109,7 +108,7 @@ def get_biggest_n_tickers(top_n, sectors=None):
         df = pd.concat([df, temp])
 
     df = df.dropna(subset={"marketCap"})
-    df = df[~df["symbol"].str.contains("\.|\^")]
+    df = df[~df["symbol"].str.contains(r"\.|\^")]
 
     if sectors is not None:
         if isinstance(sectors, str):
@@ -166,7 +165,7 @@ def __exchange2df(exchange):
 def __exchange2list(exchange):
     df = __exchange2df(exchange)
     # removes weird tickers
-    df_filtered = df[~df["symbol"].str.contains("\.|\^")]
+    df_filtered = df[~df["symbol"].str.contains(r"\.|\^")]
     return df_filtered["symbol"].tolist()
 
 
@@ -174,7 +173,7 @@ def __exchange2list(exchange):
 def __exchange2list_filtered(exchange, mktcap_min=None, mktcap_max=None, sectors=None):
     df = __exchange2df(exchange)
     df = df.dropna(subset={"marketCap"})
-    df = df[~df["symbol"].str.contains("\.|\^")]
+    df = df[~df["symbol"].str.contains(r"\.|\^")]
 
     if sectors is not None:
         if isinstance(sectors, str):
