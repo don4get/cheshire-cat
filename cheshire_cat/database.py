@@ -114,6 +114,34 @@ class PortfolioTransaction(Base):
     fees: Mapped[float] = mapped_column(Float, default=0.0)
 
 
+class TickerSymbol(Base):
+    """A symbol in the tracked Nasdaq/PEA universe."""
+
+    __tablename__ = "ticker_universe"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    exchange: Mapped[str] = mapped_column(String(32), index=True)
+    name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    isin: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    pea_eligible: Mapped[bool] = mapped_column(default=False, index=True)
+    source: Mapped[str] = mapped_column(String(128))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class IngestionState(Base):
+    """Per-symbol cursor used to spread a large universe over many runs."""
+
+    __tablename__ = "ingestion_state"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    last_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_due_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    last_price_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 def get_engine(database_url: str | None = None):
     """Create an engine for the configured database URL."""
 

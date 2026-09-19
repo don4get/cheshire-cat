@@ -1,0 +1,12 @@
+[application]
+name = "cheshire-cat-dashboard"
+default_platform = "web"
+out_dir = "dist"
+asset_dir = "assets"
+
+[web.app]
+title = "Cheshire Cat — Markets"
+
+[web.wasm_opt]
+level = "z"
+enable-mutable-globals = true

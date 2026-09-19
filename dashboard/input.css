@@ -1,0 +1,3 @@
+/* Optional Tailwind v4 source for teams that prefer rebuilding the asset. */
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));

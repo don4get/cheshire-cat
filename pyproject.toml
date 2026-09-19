@@ -18,18 +18,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-market-data = ["yfinance>=0.2.40"]
+market-data = ["yfinance>=0.2.40", "curl-cffi>=0.7"]
 reports = ["beautifulsoup4>=4.12", "markdownify>=0.13", "pypdf>=4.0"]
 dashboard = ["dash>=2.17", "plotly>=5.22"]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 legacy = ["yahooquery>=2.3"]
 all = [
   "yfinance>=0.2.40",
+  "curl-cffi>=0.7",
   "yahooquery>=2.3",
   "beautifulsoup4>=4.12",
   "markdownify>=0.13",
   "pypdf>=4.0",
   "dash>=2.17",
   "plotly>=5.22",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
 ]
 dev = ["pytest>=8.0", "ruff>=0.6"]
 

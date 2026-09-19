@@ -11,8 +11,10 @@ import pandas as pd
 from .backtest import StrategyConfig, backtest
 from .config import settings
 from .database import create_schema
-from .market_data import ingest_history
+from .market_data import DailyRequestBudget, ingest_history, ingest_universe_history
+from .proxy import DEFAULT_PROXY_SOURCE, ProxyPool
 from .reports import ingest_fundamentals, ingest_reports
+from .universe import discover_universe
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,7 +30,29 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--start")
     history.add_argument("--end")
     history.add_argument("--interval", default="1d")
+    history.add_argument("--proxy-source", default=None, help="Proxy-list URL; enables rotating proxies")
+    history.add_argument("--max-requests-per-day", type=int)
+    history.add_argument("--request-delay", type=float, default=0.0)
     history.set_defaults(handler=_history)
+
+    universe = subparsers.add_parser(
+        "universe",
+        help="Refresh Nasdaq/PEA symbols and ingest a small scheduled history slice",
+    )
+    universe.add_argument("--pea-csv", type=Path, help="Authoritative PEA eligibility CSV")
+    universe.add_argument("--no-nasdaq", action="store_true")
+    universe.add_argument("--no-french-pea", action="store_true")
+    universe.add_argument("--max-symbols", type=int, default=25)
+    universe.add_argument("--cadence-days", type=int, default=1)
+    universe.add_argument("--interval", default="1wk", choices=("1d", "5d", "1wk", "1mo"))
+    universe.add_argument("--start")
+    universe.add_argument("--end")
+    universe.add_argument("--proxy-source", default=DEFAULT_PROXY_SOURCE)
+    universe.add_argument("--no-proxy-rotation", action="store_true")
+    universe.add_argument("--max-requests-per-day", type=int, default=25)
+    universe.add_argument("--request-delay", type=float, default=1.0)
+    universe.add_argument("--dry-run", action="store_true")
+    universe.set_defaults(handler=_universe)
 
     reports = subparsers.add_parser("reports", help="Archive SEC annual and quarterly reports")
     _symbol_args(reports)
@@ -54,6 +78,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--port", type=int, default=8050)
     dashboard.add_argument("--debug", action="store_true")
     dashboard.set_defaults(handler=_dashboard)
+
+    api = subparsers.add_parser("api", help="Run the JSON API used by the Dioxus dashboard")
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8000)
+    api.add_argument("--reload", action="store_true")
+    api.set_defaults(handler=_api)
     return parser
 
 
@@ -76,7 +106,50 @@ def _init_db(args: argparse.Namespace) -> None:
 
 def _history(args: argparse.Namespace) -> None:
     create_schema(args.database_url)
-    print(json.dumps(ingest_history(_symbols(args), args.start, args.end, args.interval, args.database_url)))
+    pool = ProxyPool.from_free_proxy_list(args.proxy_source) if args.proxy_source else None
+    budget = DailyRequestBudget(args.max_requests_per_day, args.request_delay)
+    print(
+        json.dumps(
+            ingest_history(
+                _symbols(args),
+                args.start,
+                args.end,
+                args.interval,
+                args.database_url,
+                proxy_pool=pool,
+                request_budget=budget,
+            )
+        )
+    )
+
+
+def _universe(args: argparse.Namespace) -> None:
+    if args.no_nasdaq and args.no_french_pea:
+        raise SystemExit("At least one universe source must be enabled")
+    records = discover_universe(
+        include_nasdaq=not args.no_nasdaq,
+        include_french_pea=not args.no_french_pea,
+        pea_csv=args.pea_csv,
+    )
+    if args.dry_run:
+        print(json.dumps({"symbols": len(records), "sample": [record.symbol for record in records[:20]]}))
+        return
+    pool = None if args.no_proxy_rotation else ProxyPool.from_free_proxy_list(args.proxy_source)
+    summary = ingest_universe_history(
+        records,
+        include_nasdaq=not args.no_nasdaq,
+        include_french_pea=not args.no_french_pea,
+        pea_csv=str(args.pea_csv) if args.pea_csv else None,
+        max_symbols_per_run=args.max_symbols,
+        cadence_days=args.cadence_days,
+        interval=args.interval,
+        start=args.start,
+        end=args.end,
+        database_url=args.database_url,
+        proxy_pool=pool,
+        request_budget=DailyRequestBudget(args.max_requests_per_day, args.request_delay),
+    )
+    print(json.dumps({"universe": len(records), **summary}))
 
 
 def _reports(args: argparse.Namespace) -> None:
@@ -100,6 +173,12 @@ def _dashboard(args: argparse.Namespace) -> None:
     from .dashboard import run_dashboard
 
     run_dashboard(args.database_url, args.host, args.port, args.debug)
+
+
+def _api(args: argparse.Namespace) -> None:
+    from .api import run_api
+
+    run_api(args.database_url, args.host, args.port, args.reload)
 
 
 def main(argv: list[str] | None = None) -> None:

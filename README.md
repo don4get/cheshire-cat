@@ -16,7 +16,8 @@ uv sync --extra all --extra dev
 uv run cheshire-cat init-db
 uv run cheshire-cat history --symbols MSFT,AAPL --start 2015-01-01
 uv run cheshire-cat reports --symbols MSFT,AAPL --year 2026
-uv run cheshire-cat dashboard
+uv run cheshire-cat api
+cd dashboard && dx serve --platform web
 ```
 
 The reports command keeps the downloaded source under
@@ -57,3 +58,30 @@ print(result.metrics, result.benchmark_metrics)
 Use `cheshire_cat.dashboard.create_app()` to embed the Dash app in a larger
 deployment. Dashboard-only dependencies are optional so ingestion and tests
 remain usable in headless environments.
+
+## Dioxus dashboard and large-universe ingestion
+
+The primary dashboard frontend is now the Dioxus 0.7.10 app in `dashboard/`.
+It consumes `/api/dashboard` and falls back to a labelled demo snapshot when
+the API is not running. The Python Dash app remains available as a compatibility
+frontend.
+
+To refresh all Nasdaq symbols plus the French PEA candidate universe without
+hammering Yahoo or growing the database unnecessarily:
+
+```bash
+uv run cheshire-cat universe --max-symbols 25 --interval 1wk
+```
+
+Each run persists the universe and processes only symbols whose cursor is due.
+The default is 25 weekly observations per run, with rotating HTTPS proxies and
+a one-second request delay. For an authoritative broker/issuer eligibility
+list, provide a CSV with `symbol`, `isin`, `name`, `exchange`, and
+`pea_eligible` columns:
+
+```bash
+uv run cheshire-cat universe --pea-csv data/pea_eligible.csv
+```
+
+Use owned proxies in production; the public proxy-list fallback is intended
+only for low-volume research.
