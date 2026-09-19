@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 from sqlalchemy import select
 
-from .dashboard import dashboard_data, fundamental_metrics, latest_fundamentals, portfolio_valuation
+from .dashboard import dashboard_data, fundamental_metrics, portfolio_valuation
 from .database import PortfolioTransaction, Price, TickerSymbol, create_schema, get_engine
 
 
@@ -57,7 +57,7 @@ def create_app(database_url: str | None = None):
                 ).scalar_one_or_none()
         data = dashboard_data(database_url, selected_symbol)
         prices = data["prices"]
-        facts = latest_fundamentals(data["fundamentals"])
+        facts = data["fundamentals"]
         valuation = portfolio_valuation(data)
         tracked_symbols = set(universe_symbols)
         symbols = sorted(

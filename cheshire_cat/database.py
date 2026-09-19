@@ -92,7 +92,7 @@ class FundamentalFact(Base):
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     cik: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     taxonomy: Mapped[str] = mapped_column(String(32))
-    concept: Mapped[str] = mapped_column(String(128), index=True)
+    concept: Mapped[str] = mapped_column(Text, index=True)
     unit: Mapped[str] = mapped_column(String(32))
     period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     period_end: Mapped[date] = mapped_column(Date, index=True)
@@ -158,6 +158,7 @@ def create_schema(database_url: str | None = None) -> None:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE prices ALTER COLUMN volume TYPE BIGINT"))
             connection.execute(text("ALTER TABLE ticker_universe ALTER COLUMN pea_eligible DROP NOT NULL"))
+            connection.execute(text("ALTER TABLE fundamental_facts ALTER COLUMN concept TYPE TEXT"))
 
 
 def upsert_prices(session: Session, rows: list[dict[str, Any]]) -> int:

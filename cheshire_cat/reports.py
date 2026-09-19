@@ -170,7 +170,7 @@ def extract_company_facts(
 
 def ingest_fundamentals(
     symbols: list[str],
-    filed_year: int | None = 2026,
+    filed_year: int | None = None,
     forms: Iterable[str] = DEFAULT_FORMS,
     database_url: str | None = None,
     client: SecFilingsClient | None = None,

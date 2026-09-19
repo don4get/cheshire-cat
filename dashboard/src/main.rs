@@ -41,9 +41,14 @@ struct Metric {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 struct Fundamental {
     symbol: String,
+    taxonomy: String,
     concept: String,
     unit: String,
+    period_start: Option<String>,
     period_end: String,
+    filed: String,
+    form: String,
+    frame: Option<String>,
     value: Option<f64>,
 }
 
@@ -234,11 +239,6 @@ fn Overview(
         .filter(|report| report.symbol == selected)
         .take(4)
         .collect();
-    let recent_facts: Vec<Fundamental> = fundamentals
-        .into_iter()
-        .filter(|fact| fact.symbol == selected)
-        .take(5)
-        .collect();
     let latest_date = selected_prices
         .last()
         .map(|point| point.date.clone())
@@ -261,7 +261,7 @@ fn Overview(
                 StatCard { label: "1Y RETURN", value: metric.return_1y.map(format_percent).unwrap_or_else(|| "—".to_string()), accent: "gold" }
                 StatCard { label: "VOLATILITY", value: metric.volatility.map(format_percent).unwrap_or_else(|| "—".to_string()), accent: "blue" }
                 StatCard { label: "OBSERVATIONS", value: selected_prices.len().to_string(), accent: "green" }
-                StatCard { label: "FILINGS", value: recent_reports.len().to_string(), accent: "violet" }
+                StatCard { label: "FUNDAMENTALS", value: fundamentals.len().to_string(), accent: "violet" }
             }
             div { class: "panel chart-panel",
                 div { class: "panel-header",
@@ -280,12 +280,21 @@ fn Overview(
             }
             div { class: "two-column",
                 div { class: "panel",
-                    div { class: "panel-header", h2 { "Latest fundamentals" }, span { class: "panel-link", "SEC XBRL" } }
-                    table { class: "data-table",
-                        thead { tr { th { "Concept" } th { "Period" } th { "Value" } } }
-                        tbody {
-                            for fact in recent_facts {
-                                tr { key: "{fact.concept}-{fact.period_end}", td { "{fact.concept}" }, td { class: "muted", "{fact.period_end}" }, td { class: "number", "{fundamental_value(&fact)}" } }
+                    div { class: "panel-header", h2 { "All fundamental metrics" }, span { class: "panel-link", "SEC XBRL · {fundamentals.len()} observations" } }
+                    div { class: "fundamentals-table-wrap",
+                        table { class: "data-table fundamentals-table",
+                            thead { tr { th { "Metric" } th { "Unit" } th { "Period" } th { "Filed" } th { "Form" } th { "Value" } } }
+                            tbody {
+                                for fact in fundamentals {
+                                    tr { key: "{fact.taxonomy}-{fact.concept}-{fact.unit}-{fact.period_end}-{fact.filed}-{fact.form}",
+                                        td { "{fact.concept}" }
+                                        td { class: "muted", "{fact.unit}" }
+                                        td { class: "muted", "{fact.period_end}" }
+                                        td { class: "muted", "{fact.filed}" }
+                                        td { class: "muted", "{fact.form}" }
+                                        td { class: "number", "{fundamental_value(&fact)}" }
+                                    }
+                                }
                             }
                         }
                     }

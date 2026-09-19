@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     fundamentals = subparsers.add_parser("fundamentals", help="Import SEC XBRL balance-sheet and other facts")
     _symbol_args(fundamentals)
-    fundamentals.add_argument("--filed-year", type=int, default=2026)
+    fundamentals.add_argument("--filed-year", type=int, help="Restrict facts to a filing year")
     fundamentals.set_defaults(handler=_fundamentals)
 
     run_backtest = subparsers.add_parser("backtest", help="Backtest the investment agent on a CSV")

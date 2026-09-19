@@ -40,8 +40,33 @@ def dashboard_data(database_url: str | None = None, symbol: str | None = None) -
             columns=["symbol", "form", "filing_date", "period_end", "markdown_path"],
         ),
         "fundamentals": pd.DataFrame(
-            [{"symbol": f.symbol, "concept": f.concept, "unit": f.unit, "period_end": f.period_end, "filed": f.filed, "form": f.form, "value": f.value} for f in fact_rows],
-            columns=["symbol", "concept", "unit", "period_end", "filed", "form", "value"],
+            [
+                {
+                    "symbol": f.symbol,
+                    "taxonomy": f.taxonomy,
+                    "concept": f.concept,
+                    "unit": f.unit,
+                    "period_start": f.period_start,
+                    "period_end": f.period_end,
+                    "filed": f.filed,
+                    "form": f.form,
+                    "frame": f.frame,
+                    "value": f.value,
+                }
+                for f in fact_rows
+            ],
+            columns=[
+                "symbol",
+                "taxonomy",
+                "concept",
+                "unit",
+                "period_start",
+                "period_end",
+                "filed",
+                "form",
+                "frame",
+                "value",
+            ],
         ),
         "transactions": pd.DataFrame(
             [{"portfolio": t.portfolio, "symbol": t.symbol, "trade_date": t.trade_date, "quantity": t.quantity, "price": t.price, "fees": t.fees} for t in transaction_rows],

@@ -16,6 +16,7 @@ uv sync --extra all --extra dev
 uv run cheshire-cat init-db
 uv run cheshire-cat history --symbols MSFT,AAPL --start 2015-01-01
 uv run cheshire-cat reports --symbols MSFT,AAPL --year 2026
+uv run cheshire-cat fundamentals --symbols AAPL
 uv run cheshire-cat api
 cd dashboard && dx serve --platform web
 ```
@@ -24,6 +25,10 @@ The reports command keeps the downloaded source under
 `data/reports/<SYMBOL>/<YEAR>/` and writes a Markdown rendering next to it.
 SEC requests require a real identifying `SEC_USER_AGENT` containing a contact
 address; do not use a made-up browser identity.
+
+The fundamentals command imports all available SEC XBRL observations for the
+requested symbols by default. Use `--filed-year YYYY` only when a narrower
+filing-year slice is wanted.
 
 ## Backtesting
 

@@ -78,6 +78,8 @@ button { border: 0; }
 .data-table th { padding: 0 8px 12px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .11em; text-align: left; }
 .data-table td { padding: 13px 8px; border-top: 1px solid var(--line); color: var(--cream); }
 .data-table td.muted { color: var(--muted); }.data-table td.number { color: var(--gold-bright); text-align: right; }
+.fundamentals-table-wrap { max-height: 520px; overflow: auto; }
+.fundamentals-table { min-width: 700px; }
 .report-list { display: flex; flex-direction: column; }
 .report-row { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-top: 1px solid var(--line); }
 .report-icon { width: 29px; height: 29px; display: grid; place-items: center; color: var(--gold); border: 1px solid var(--line-bright); border-radius: 7px; }
