@@ -14,6 +14,7 @@ enum View {
 struct DashboardSnapshot {
     symbols: Vec<String>,
     selected_symbol: Option<String>,
+    selected_exchange: Option<String>,
     prices: Vec<PricePoint>,
     metrics: Vec<Metric>,
     fundamentals: Vec<Fundamental>,
@@ -68,17 +69,25 @@ fn main() {
 fn App() -> Element {
     let mut dark = use_signal(|| true);
     let mut search = use_signal(String::new);
-    let mut selected = use_signal(|| "MSFT".to_string());
+    let mut selected = use_signal(String::new);
     let mut view = use_signal(|| View::Overview);
-    let snapshot = use_resource(|| async { load_snapshot().await });
+    let snapshot = use_resource(move || {
+        let symbol = selected();
+        async move { load_snapshot(symbol).await }
+    });
 
-    let is_live = snapshot.read().as_ref().is_some();
-    let data = snapshot
+    let live_snapshot = snapshot
         .read()
         .as_ref()
-        .cloned()
-        .flatten()
-        .unwrap_or_else(DashboardSnapshot::demo);
+        .and_then(|result| result.as_ref().ok())
+        .cloned();
+    let is_live = live_snapshot.is_some();
+    let data = live_snapshot.unwrap_or_default();
+    let active_symbol = if selected().is_empty() {
+        data.selected_symbol.clone().unwrap_or_default()
+    } else {
+        selected()
+    };
     let filtered_symbols: Vec<String> = data
         .symbols
         .iter()
@@ -89,13 +98,13 @@ fn App() -> Element {
     let selected_prices: Vec<PricePoint> = data
         .prices
         .iter()
-        .filter(|point| point.symbol == selected())
+        .filter(|point| point.symbol == active_symbol)
         .cloned()
         .collect();
     let active_metric = data
         .metrics
         .iter()
-        .find(|metric| metric.symbol == selected())
+        .find(|metric| metric.symbol == active_symbol)
         .cloned()
         .unwrap_or_default();
     let api_status_class = if is_live { "online" } else { "offline" };
@@ -144,7 +153,7 @@ fn App() -> Element {
                 div { class: "api-card",
                     div { class: "api-dot {api_status_class}" }
                     div {
-                        div { class: "api-title", if is_live { "Live database" } else { "Demo snapshot" } }
+                        div { class: "api-title", if is_live { "Live database" } else { "API unavailable" } }
                         div { class: "api-copy", if is_live { "PostgreSQL connected" } else { "Start cheshire-cat api" } }
                     }
                 }
@@ -161,17 +170,24 @@ fn App() -> Element {
                         }}
                     }
                     div { class: "topbar-actions",
-                        div { class: "market-status", span { class: "pulse" }, "Markets open" }
+                        div { class: "market-status", span { class: "pulse" }, if is_live { "LIVE DATA" } else { "NO LIVE DATA" } }
                         button { class: "theme-button", onclick: move |_| dark.toggle(), aria_label: "Toggle dark mode", if dark() { "☼" } else { "☾" } }
                     }
                 }
                 if view() == View::Overview {
-                    Overview {
-                        selected: selected(),
-                        selected_prices: selected_prices.clone(),
-                        metric: active_metric.clone(),
-                        reports: data.reports.clone(),
-                        fundamentals: data.fundamentals.clone(),
+                    if !is_live {
+                        DataState { title: "Live data unavailable", copy: "Start the API and reload the dashboard." }
+                    } else if !selected_prices.iter().any(|point| point.adj_close.or(point.close).is_some()) {
+                        DataState { title: "No historical data loaded", copy: "Run the universe ingestion command to populate PostgreSQL." }
+                    } else {
+                        Overview {
+                            selected: active_symbol.clone(),
+                            exchange: data.selected_exchange.clone().unwrap_or_else(|| "—".to_string()),
+                            selected_prices: selected_prices.clone(),
+                            metric: active_metric.clone(),
+                            reports: data.reports.clone(),
+                            fundamentals: data.fundamentals.clone(),
+                        }
                     }
                 } else if view() == View::Portfolio {
                     PortfolioView { points: data.portfolio.clone() }
@@ -179,7 +195,8 @@ fn App() -> Element {
                     UniverseView {
                         search: search(),
                         symbols: filtered_symbols.clone(),
-                        selected: selected(),
+                        total: data.symbols.len(),
+                        selected: active_symbol.clone(),
                         on_search: move |value: String| search.set(value),
                         on_select: move |symbol: String| selected.set(symbol),
                     }
@@ -192,6 +209,7 @@ fn App() -> Element {
 #[component]
 fn Overview(
     selected: String,
+    exchange: String,
     selected_prices: Vec<PricePoint>,
     metric: Metric,
     reports: Vec<Report>,
@@ -199,17 +217,17 @@ fn Overview(
 ) -> Element {
     let last_price = selected_prices
         .last()
-        .and_then(|point| point.adj_close.or(point.close))
-        .unwrap_or(0.0);
+        .and_then(|point| point.adj_close.or(point.close));
     let first_price = selected_prices
         .first()
-        .and_then(|point| point.adj_close.or(point.close))
-        .unwrap_or(last_price);
-    let change = if first_price > 0.0 {
-        last_price / first_price - 1.0
-    } else {
-        0.0
-    };
+        .and_then(|point| point.adj_close.or(point.close));
+    let change = first_price
+        .zip(last_price)
+        .filter(|(first, _)| *first > 0.0)
+        .map(|(first, last)| last / first - 1.0);
+    let price_label = last_price
+        .map(|price| format!("${price:.2}"))
+        .unwrap_or_else(|| "—".to_string());
     let chart_points = sparkline_points(&selected_prices);
     let recent_reports: Vec<Report> = reports
         .into_iter()
@@ -231,15 +249,17 @@ fn Overview(
             div { class: "ticker-strip",
                 div { class: "ticker-heading",
                     span { class: "ticker-symbol", "{selected}" }
-                    span { class: "ticker-exchange", "NASDAQ / XPAR" }
+                    span { class: "ticker-exchange", "{exchange}" }
                 }
-                div { class: "ticker-price", "${last_price:.2}" }
-                div { class: if change >= 0.0 { "change positive" } else { "change negative" }, "{change:+.2}%" }
+                div { class: "ticker-price", "{price_label}" }
+                if let Some(change) = change {
+                    div { class: if change >= 0.0 { "change positive" } else { "change negative" }, "{change:+.2}%" }
+                }
                 div { class: "ticker-meta", "Latest close · {latest_date}" }
             }
             div { class: "stat-grid",
-                StatCard { label: "1Y RETURN", value: format_percent(metric.return_1y.unwrap_or(change)), accent: "gold" }
-                StatCard { label: "VOLATILITY", value: format_percent(metric.volatility.unwrap_or(0.184)), accent: "blue" }
+                StatCard { label: "1Y RETURN", value: metric.return_1y.map(format_percent).unwrap_or_else(|| "—".to_string()), accent: "gold" }
+                StatCard { label: "VOLATILITY", value: metric.volatility.map(format_percent).unwrap_or_else(|| "—".to_string()), accent: "blue" }
                 StatCard { label: "OBSERVATIONS", value: selected_prices.len().to_string(), accent: "green" }
                 StatCard { label: "FILINGS", value: recent_reports.len().to_string(), accent: "violet" }
             }
@@ -296,6 +316,7 @@ fn StatCard(label: &'static str, value: String, accent: &'static str) -> Element
 fn UniverseView(
     search: String,
     symbols: Vec<String>,
+    total: usize,
     selected: String,
     on_search: EventHandler<String>,
     on_select: EventHandler<String>,
@@ -304,7 +325,7 @@ fn UniverseView(
         section { class: "content-stack",
             div { class: "hero-panel",
                 div { class: "hero-copy", span { class: "hero-kicker", "UNIVERSE" }, h2 { "Signal over noise." }, p { "Nasdaq and French PEA candidates, refreshed in small daily slices to respect provider limits." } }
-                div { class: "universe-count", span { "TRACKED" }, strong { "{symbols.len()}+" }, small { "visible matches" } }
+                div { class: "universe-count", span { "TRACKED" }, strong { "{total}" }, small { "symbols" } }
             }
             div { class: "panel",
                 div { class: "toolbar", h2 { "Symbols" }, input { class: "search-input", value: "{search}", placeholder: "Search ticker…", oninput: move |event| on_search.call(event.value()) } }
@@ -320,20 +341,30 @@ fn UniverseView(
 
 #[component]
 fn PortfolioView(points: Vec<PortfolioPoint>) -> Element {
-    let value = points
-        .last()
-        .and_then(|point| point.value)
-        .unwrap_or(100_000.0);
     rsx! {
         section { class: "content-stack",
-            div { class: "portfolio-hero",
-                div { class: "hero-kicker", "TOTAL PORTFOLIO VALUE" }
-                div { class: "portfolio-value", "${value:.2}" }
-                div { class: "change positive", "+8.42% all time" }
+            if let Some(value) = points.last().and_then(|point| point.value) {
+                div { class: "portfolio-hero",
+                    div { class: "hero-kicker", "TOTAL PORTFOLIO VALUE" }
+                    div { class: "portfolio-value", "${value:.2}" }
+                }
             }
             div { class: "panel",
-                div { class: "panel-header", h2 { "Portfolio curve" }, span { class: "panel-badge", "LIVE" } }
-                div { class: "empty-state", if points.is_empty() { "Record a trade in the API to start tracking value." } else { "Portfolio observations loaded from PostgreSQL." } }
+                div { class: "panel-header", h2 { "Portfolio curve" }, span { class: "panel-badge", "POSTGRESQL" } }
+                div { class: "empty-state", if points.is_empty() { "No portfolio transactions are stored." } else { "Portfolio observations loaded from PostgreSQL." } }
+            }
+        }
+    }
+}
+
+#[component]
+fn DataState(title: &'static str, copy: &'static str) -> Element {
+    rsx! {
+        section { class: "content-stack",
+            div { class: "panel empty-state",
+                div { class: "hero-kicker", "NO FABRICATED DATA" }
+                h2 { "{title}" }
+                p { "{copy}" }
             }
         }
     }
@@ -395,82 +426,23 @@ fn fundamental_value(fact: &Fundamental) -> String {
         .unwrap_or_else(|| "—".to_string())
 }
 
-async fn load_snapshot() -> Option<DashboardSnapshot> {
+async fn load_snapshot(symbol: String) -> Result<DashboardSnapshot, String> {
     #[cfg(target_arch = "wasm32")]
     {
-        gloo_net::http::Request::get("/api/dashboard")
+        let endpoint = if symbol.is_empty() {
+            "/api/dashboard".to_string()
+        } else {
+            format!("/api/dashboard?symbol={symbol}")
+        };
+        let response = gloo_net::http::Request::get(&endpoint)
             .send()
             .await
-            .ok()?
-            .json()
-            .await
-            .ok()
+            .map_err(|error| error.to_string())?;
+        response.json().await.map_err(|error| error.to_string())
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        None
-    }
-}
-
-impl DashboardSnapshot {
-    fn demo() -> Self {
-        let prices = [
-            102.0, 104.0, 103.0, 108.0, 111.0, 109.0, 114.0, 118.0, 121.0, 119.0, 124.0, 128.0,
-        ]
-        .iter()
-        .enumerate()
-        .map(|(index, value)| PricePoint {
-            date: format!("2026-{index:02}"),
-            symbol: "MSFT".to_string(),
-            close: Some(*value),
-            adj_close: Some(*value),
-        })
-        .collect();
-        Self {
-            symbols: vec![
-                "MSFT", "AAPL", "NVDA", "ASML.PA", "AIR.PA", "MC.PA", "OR.PA", "TTE.PA",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect(),
-            selected_symbol: Some("MSFT".to_string()),
-            prices,
-            metrics: vec![Metric {
-                symbol: "MSFT".to_string(),
-                last_price: Some(128.0),
-                return_1y: Some(0.184),
-                volatility: Some(0.211),
-            }],
-            fundamentals: vec![
-                Fundamental {
-                    symbol: "MSFT".to_string(),
-                    concept: "Assets".to_string(),
-                    unit: "USD".to_string(),
-                    period_end: "2026-06-30".to_string(),
-                    value: Some(619_000_000_000.0),
-                },
-                Fundamental {
-                    symbol: "MSFT".to_string(),
-                    concept: "Revenues".to_string(),
-                    unit: "USD".to_string(),
-                    period_end: "2026-06-30".to_string(),
-                    value: Some(281_000_000_000.0),
-                },
-                Fundamental {
-                    symbol: "MSFT".to_string(),
-                    concept: "NetIncomeLoss".to_string(),
-                    unit: "USD".to_string(),
-                    period_end: "2026-06-30".to_string(),
-                    value: Some(101_000_000_000.0),
-                },
-            ],
-            reports: vec![Report {
-                symbol: "MSFT".to_string(),
-                form: "10-K".to_string(),
-                filing_date: "2026-07-30".to_string(),
-                markdown_path: None,
-            }],
-            portfolio: Vec::new(),
-        }
+        let _ = symbol;
+        Err("dashboard data is loaded by the browser".to_string())
     }
 }

@@ -43,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     universe.add_argument("--no-nasdaq", action="store_true")
     universe.add_argument("--no-french-pea", action="store_true")
     universe.add_argument("--max-symbols", type=int, default=25)
+    universe.add_argument("--workers", type=int, default=1, help="Concurrent Yahoo history requests")
     universe.add_argument("--cadence-days", type=int, default=1)
     universe.add_argument("--interval", default="1wk", choices=("1d", "5d", "1wk", "1mo"))
     universe.add_argument("--start")
@@ -148,6 +149,7 @@ def _universe(args: argparse.Namespace) -> None:
         database_url=args.database_url,
         proxy_pool=pool,
         request_budget=DailyRequestBudget(args.max_requests_per_day, args.request_delay),
+        workers=args.workers,
     )
     print(json.dumps({"universe": len(records), **summary}))
 

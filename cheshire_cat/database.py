@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Date,
     DateTime,
     Float,
@@ -46,7 +47,7 @@ class Price(Base):
     low: Mapped[float | None] = mapped_column(Float, nullable=True)
     close: Mapped[float | None] = mapped_column(Float, nullable=True)
     adj_close: Mapped[float | None] = mapped_column(Float, nullable=True)
-    volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     source: Mapped[str] = mapped_column(String(64), default="yfinance")
     ingested_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
@@ -149,28 +150,51 @@ def get_engine(database_url: str | None = None):
 
 
 def create_schema(database_url: str | None = None) -> None:
-    Base.metadata.create_all(get_engine(database_url))
+    engine = get_engine(database_url)
+    Base.metadata.create_all(engine)
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import text
+
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE prices ALTER COLUMN volume TYPE BIGINT"))
 
 
 def upsert_prices(session: Session, rows: list[dict[str, Any]]) -> int:
     """Insert prices idempotently, updating a symbol/date row when it exists."""
 
-    count = 0
-    for row in rows:
-        symbol = str(row["symbol"]).upper()
-        price_date = row["date"]
-        existing = session.scalar(
-            select(Price).where(Price.symbol == symbol, Price.date == price_date)
-        )
-        values = {k: v for k, v in row.items() if k not in {"symbol", "date"}}
-        if existing is None:
-            session.add(Price(symbol=symbol, date=price_date, **values))
-        else:
-            for key, value in values.items():
-                setattr(existing, key, value)
-        count += 1
+    if not rows:
+        return 0
+    values = [{**row, "symbol": str(row["symbol"]).upper()} for row in rows]
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:
+        for row in values:
+            existing = session.scalar(
+                select(Price).where(Price.symbol == row["symbol"], Price.date == row["date"])
+            )
+            update = {key: value for key, value in row.items() if key not in {"symbol", "date"}}
+            if existing is None:
+                session.add(Price(**row))
+            else:
+                for key, value in update.items():
+                    setattr(existing, key, value)
+        session.commit()
+        return len(values)
+
+    statement = insert(Price).values(values)
+    update = {
+        key: getattr(statement.excluded, key)
+        for key in values[0]
+        if key not in {"symbol", "date"}
+    }
+    session.execute(
+        statement.on_conflict_do_update(index_elements=["symbol", "date"], set_=update)
+    )
     session.commit()
-    return count
+    return len(values)
 
 
 def prices_as_frame(session: Session, symbols: list[str] | None = None):
