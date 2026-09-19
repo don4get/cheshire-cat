@@ -2,6 +2,11 @@ use dioxus::prelude::*;
 use serde::Deserialize;
 
 const GOLD: &str = "#d6a84f";
+#[cfg(target_arch = "wasm32")]
+const API_BASE: &str = match option_env!("CHESHIRE_CAT_API_URL") {
+    Some(value) => value,
+    None => "",
+};
 
 #[derive(Clone, Copy, PartialEq)]
 enum View {
@@ -438,10 +443,15 @@ fn fundamental_value(fact: &Fundamental) -> String {
 async fn load_snapshot(symbol: String) -> Result<DashboardSnapshot, String> {
     #[cfg(target_arch = "wasm32")]
     {
-        let endpoint = if symbol.is_empty() {
+        let path = if symbol.is_empty() {
             "/api/dashboard".to_string()
         } else {
             format!("/api/dashboard?symbol={symbol}")
+        };
+        let endpoint = if API_BASE.is_empty() {
+            path
+        } else {
+            format!("{API_BASE}{path}")
         };
         let response = gloo_net::http::Request::get(&endpoint)
             .send()

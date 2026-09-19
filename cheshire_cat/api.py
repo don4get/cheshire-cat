@@ -19,6 +19,7 @@ from .database import PortfolioTransaction, Price, TickerSymbol, create_schema, 
 def create_app(database_url: str | None = None):
     try:
         from fastapi import FastAPI, HTTPException
+        from fastapi.middleware.cors import CORSMiddleware
         from pydantic import BaseModel, Field
     except ImportError as exc:
         raise RuntimeError("Install API support with `uv sync --extra api`.") from exc
@@ -32,6 +33,13 @@ def create_app(database_url: str | None = None):
         fees: float = Field(default=0, ge=0)
 
     app = FastAPI(title="Cheshire Cat market data API", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:8080", "http://localhost:8080"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
     create_schema(database_url)
 
     @app.get("/health")
