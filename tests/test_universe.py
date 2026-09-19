@@ -44,7 +44,7 @@ def test_nasdaq_and_euronext_parsers_normalize_symbols():
         )
     )
     assert euronext.fetch()[0].symbol == "AF.PA"
-    assert euronext.fetch()[0].pea_eligible is True
+    assert euronext.fetch()[0].pea_eligible is None
 
 
 def test_euronext_parser_requests_all_pages():

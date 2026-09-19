@@ -125,7 +125,7 @@ class TickerSymbol(Base):
     name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     isin: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
-    pea_eligible: Mapped[bool] = mapped_column(default=False, index=True)
+    pea_eligible: Mapped[bool | None] = mapped_column(default=None, nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(128))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -157,6 +157,7 @@ def create_schema(database_url: str | None = None) -> None:
 
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE prices ALTER COLUMN volume TYPE BIGINT"))
+            connection.execute(text("ALTER TABLE ticker_universe ALTER COLUMN pea_eligible DROP NOT NULL"))
 
 
 def upsert_prices(session: Session, rows: list[dict[str, Any]]) -> int:

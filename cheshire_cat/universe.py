@@ -39,7 +39,7 @@ class TickerRecord:
     name: str | None = None
     isin: str | None = None
     currency: str | None = None
-    pea_eligible: bool = False
+    pea_eligible: bool | None = None
     source: str = "unknown"
 
 
@@ -146,10 +146,10 @@ class FrenchPeaUniverseSource:
                     name=name,
                     isin=isin,
                     currency=currency,
-                    # The public directory has no eligibility column. The
-                    # result is therefore an explicit candidate universe;
+                    # The public directory has no eligibility column. Keep
+                    # this unknown rather than inventing a PEA classification;
                     # pass --pea-csv for an authoritative eligibility flag.
-                    pea_eligible=True,
+                    pea_eligible=None,
                     source="euronext-paris-regulated",
                 )
             )
@@ -303,8 +303,10 @@ def _primary_market_code(row: Any) -> str | None:
     return match.group(1) if match else None
 
 
-def _parse_bool(value: Any) -> bool:
-    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "oui", "eligible"}
+def _parse_bool(value: Any) -> bool | None:
+    if value is None or not str(value).strip():
+        return None
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "oui", "eligible"}
 
 
 def _is_non_equity_instrument(name: str) -> bool:
@@ -331,7 +333,11 @@ def _deduplicate(records: list[TickerRecord]) -> list[TickerRecord]:
             name=previous.name or record.name,
             isin=previous.isin or record.isin,
             currency=previous.currency or record.currency,
-            pea_eligible=previous.pea_eligible or record.pea_eligible,
+            pea_eligible=(
+                record.pea_eligible
+                if record.pea_eligible is not None
+                else previous.pea_eligible
+            ),
             source=f"{previous.source},{record.source}",
         )
     return sorted(merged.values(), key=lambda record: record.symbol)
