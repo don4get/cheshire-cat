@@ -66,6 +66,25 @@ def test_euronext_parser_requests_all_pages():
     assert [record.symbol for record in euronext.fetch()] == ["AF.PA", "ALO.PA"]
 
 
+def test_euronext_primary_market_maps_yahoo_suffix():
+    euronext = FrenchPeaUniverseSource(
+        session=Session(
+            {
+                "aaData": [
+                    [
+                        '<a href="/en/product/equities/BE0974278104-XBRU">ABO GROUP</a>',
+                        "BE0974278104",
+                        "ABO",
+                        "Euronext Brussels, Paris",
+                        "EUR",
+                    ]
+                ]
+            }
+        )
+    )
+    assert euronext.fetch()[0].symbol == "ABO.BR"
+
+
 def test_proxy_pool_retires_bad_endpoints():
     pool = ProxyPool(["1.1.1.1:80", "2.2.2.2:80"], max_failures=1)
     first = pool.next()

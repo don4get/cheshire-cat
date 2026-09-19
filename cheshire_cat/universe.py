@@ -136,9 +136,10 @@ class FrenchPeaUniverseSource:
             currency = values[4].split()[0] if len(values) > 4 and values[4] else "EUR"
             if not symbol or not isin:
                 continue
+            market_code = _primary_market_code(row)
             records.append(
                 TickerRecord(
-                    symbol=_yahoo_paris_symbol(symbol),
+                    symbol=_yahoo_symbol(symbol, market_code),
                     exchange="EURONEXT_PARIS",
                     name=name,
                     isin=isin,
@@ -185,6 +186,14 @@ def store_universe(records: list[TickerRecord], database_url: str | None = None)
 
     create_schema(database_url)
     with Session(get_engine(database_url)) as session:
+        incoming_symbols = {record.symbol for record in records}
+        if any("euronext-paris-regulated" in record.source for record in records):
+            stale_paris = session.scalars(
+                select(TickerSymbol).where(TickerSymbol.source.like("%euronext-paris-regulated%"))
+            ).all()
+            for current in stale_paris:
+                if current.symbol not in incoming_symbols:
+                    session.delete(current)
         for record in records:
             current = session.get(TickerSymbol, record.symbol)
             values = {
@@ -266,8 +275,30 @@ def _clean_html(value: Any) -> str:
 
 
 def _yahoo_paris_symbol(symbol: str) -> str:
+    return _yahoo_symbol(symbol, "XPAR")
+
+
+def _yahoo_symbol(symbol: str, market_code: str | None) -> str:
     symbol = symbol.strip().upper()
-    return symbol if "." in symbol else f"{symbol}.PA"
+    if "." in symbol:
+        return symbol
+    suffix = {
+        "XAMS": ".AS",
+        "XBRU": ".BR",
+        "XLIS": ".LS",
+        "XPAR": ".PA",
+    }.get(market_code or "XPAR", ".PA")
+    return f"{symbol}{suffix}"
+
+
+def _primary_market_code(row: Any) -> str | None:
+    first_cell = str(row[0]) if row else ""
+    match = re.search(r"-([A-Z]{4})[\"/]", first_cell)
+    if match:
+        return match.group(1)
+    market_cell = str(row[3]) if len(row) > 3 else ""
+    match = re.search(r"\b(X[A-Z]{3})\b", market_cell)
+    return match.group(1) if match else None
 
 
 def _parse_bool(value: Any) -> bool:
