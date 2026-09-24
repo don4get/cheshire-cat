@@ -5,12 +5,33 @@ default:
     @just --list
 
 postgres:
-    docker compose up -d postgres
-    @until docker compose exec -T postgres pg_isready -U cat -d cheshire_cat >/dev/null 2>&1; do sleep 1; done
-    @echo "PostgreSQL is ready on localhost:5432"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # A PostgreSQL instance may already be running after a reboot (or may be
+    # shared with another local compose project). In that case Docker cannot
+    # claim 5432, but the dashboard can safely use the reachable configured DB.
+    if python3 -c 'import psycopg; connection = psycopg.connect("postgresql://cat:meow@localhost:5432/cheshire_cat", connect_timeout=1); connection.close()' >/dev/null 2>&1; then
+        echo "Using the existing PostgreSQL instance on localhost:5432"
+    else
+        timeout 30s docker compose up -d postgres || true
+        until python3 -c 'import psycopg; connection = psycopg.connect("postgresql://cat:meow@localhost:5432/cheshire_cat", connect_timeout=1); connection.close()' >/dev/null 2>&1; do sleep 1; done
+    fi
+    echo "PostgreSQL is ready on localhost:5432"
 
 api: postgres
     uv run cheshire-cat api --host 127.0.0.1 --port 8000
+
+# Train and persist the investor bot, with a chronological 80/20 holdout.
+research market="both": postgres
+    uv run cheshire-cat research --market {{market}}
+
+# Cost-aware walk-forward, uncertainty and stress diagnostics of saved research.
+validate market="both": postgres
+    uv run cheshire-cat validate-research --market {{market}}
+
+# All registered Atlas trials, frozen selection, later-period evaluation and stress tests.
+challenger market="both": postgres
+    uv run cheshire-cat challenger --market {{market}}
 
 dashboard: postgres
     #!/usr/bin/env bash

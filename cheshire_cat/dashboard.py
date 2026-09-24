@@ -12,49 +12,83 @@ from .database import FinancialReport, FundamentalFact, PortfolioTransaction, Pr
 from .portfolio import Trade, portfolio_curve
 
 
-def dashboard_data(database_url: str | None = None, symbol: str | None = None) -> dict[str, pd.DataFrame]:
+def dashboard_data(
+    database_url: str | None = None,
+    symbol: str | None = None,
+    fundamental_limit: int | None = None,
+) -> dict[str, pd.DataFrame]:
     """Load the datasets needed by the dashboard from PostgreSQL."""
 
     engine = get_engine(database_url)
     with Session(engine) as session:
-        price_query = select(Price).order_by(Price.date)
-        report_query = select(FinancialReport).order_by(FinancialReport.filing_date.desc())
-        fact_query = select(FundamentalFact).order_by(FundamentalFact.period_end.desc())
+        price_query = select(
+            Price.date,
+            Price.symbol,
+            Price.close,
+            Price.adj_close,
+            Price.volume,
+        ).order_by(Price.date)
+        report_query = select(
+            FinancialReport.symbol,
+            FinancialReport.form,
+            FinancialReport.filing_date,
+            FinancialReport.period_end,
+            FinancialReport.accession_number,
+            FinancialReport.source_url,
+            FinancialReport.markdown_path,
+        ).order_by(FinancialReport.filing_date.desc())
+        fact_query = select(
+            FundamentalFact.symbol,
+            FundamentalFact.taxonomy,
+            FundamentalFact.concept,
+            FundamentalFact.unit,
+            FundamentalFact.period_start,
+            FundamentalFact.period_end,
+            FundamentalFact.filed,
+            FundamentalFact.form,
+            FundamentalFact.frame,
+            FundamentalFact.value,
+        ).order_by(FundamentalFact.period_end.desc())
         transaction_query = select(PortfolioTransaction).order_by(PortfolioTransaction.trade_date)
         if symbol:
             symbol = symbol.upper()
             price_query = price_query.where(Price.symbol == symbol)
             report_query = report_query.where(FinancialReport.symbol == symbol)
             fact_query = fact_query.where(FundamentalFact.symbol == symbol)
-        price_rows = session.scalars(price_query).all()
-        report_rows = session.scalars(report_query).all()
-        fact_rows = session.scalars(fact_query).all()
+            if fundamental_limit is not None:
+                if fundamental_limit < 1:
+                    raise ValueError("fundamental_limit must be positive")
+                fact_query = fact_query.limit(fundamental_limit)
+        else:
+            # Global dashboard initialization only needs prices for the symbol
+            # picker and portfolio replay. Loading every report and fact here
+            # made the legacy Dash frontend needlessly materialize millions of
+            # rows before the user selected an instrument.
+            report_query = report_query.where(False)
+            fact_query = fact_query.where(False)
+        price_rows = session.execute(price_query).mappings().all()
+        report_rows = session.execute(report_query).mappings().all()
+        fact_rows = session.execute(fact_query).mappings().all()
         transaction_rows = session.scalars(transaction_query).all()
     return {
         "prices": pd.DataFrame(
-            [{"date": p.date, "symbol": p.symbol, "close": p.close, "adj_close": p.adj_close, "volume": p.volume} for p in price_rows],
+            [dict(row) for row in price_rows],
             columns=["date", "symbol", "close", "adj_close", "volume"],
         ),
         "reports": pd.DataFrame(
-            [{"symbol": r.symbol, "form": r.form, "filing_date": r.filing_date, "period_end": r.period_end, "markdown_path": r.markdown_path} for r in report_rows],
-            columns=["symbol", "form", "filing_date", "period_end", "markdown_path"],
+            [dict(row) for row in report_rows],
+            columns=[
+                "symbol",
+                "form",
+                "filing_date",
+                "period_end",
+                "accession_number",
+                "source_url",
+                "markdown_path",
+            ],
         ),
         "fundamentals": pd.DataFrame(
-            [
-                {
-                    "symbol": f.symbol,
-                    "taxonomy": f.taxonomy,
-                    "concept": f.concept,
-                    "unit": f.unit,
-                    "period_start": f.period_start,
-                    "period_end": f.period_end,
-                    "filed": f.filed,
-                    "form": f.form,
-                    "frame": f.frame,
-                    "value": f.value,
-                }
-                for f in fact_rows
-            ],
+            [dict(row) for row in fact_rows],
             columns=[
                 "symbol",
                 "taxonomy",

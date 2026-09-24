@@ -234,6 +234,7 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "gloo-net",
+ "gloo-timers",
  "serde",
 ]
 

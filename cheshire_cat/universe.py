@@ -39,6 +39,7 @@ class TickerRecord:
     name: str | None = None
     isin: str | None = None
     currency: str | None = None
+    sector: str | None = None
     pea_eligible: bool | None = None
     source: str = "unknown"
 
@@ -75,6 +76,7 @@ class NasdaqUniverseSource:
                     exchange="NASDAQ",
                     name=_clean(values.get("name") or values.get("companyname")),
                     currency="USD",
+                    sector=_clean(values.get("sector")),
                     source="nasdaq-screener",
                 )
             )
@@ -146,6 +148,7 @@ class FrenchPeaUniverseSource:
                     name=name,
                     isin=isin,
                     currency=currency,
+                    sector=None,
                     # The public directory has no eligibility column. Keep
                     # this unknown rather than inventing a PEA classification;
                     # pass --pea-csv for an authoritative eligibility flag.
@@ -203,6 +206,7 @@ def store_universe(records: list[TickerRecord], database_url: str | None = None)
                 "name": record.name,
                 "isin": record.isin,
                 "currency": record.currency,
+                "sector": record.sector,
                 "pea_eligible": record.pea_eligible,
                 "source": record.source,
             }
@@ -226,6 +230,7 @@ def database_universe(database_url: str | None = None) -> list[TickerRecord]:
             name=row.name,
             isin=row.isin,
             currency=row.currency,
+            sector=row.sector,
             pea_eligible=row.pea_eligible,
             source=row.source,
         )
@@ -333,6 +338,7 @@ def _deduplicate(records: list[TickerRecord]) -> list[TickerRecord]:
             name=previous.name or record.name,
             isin=previous.isin or record.isin,
             currency=previous.currency or record.currency,
+            sector=previous.sector or record.sector,
             pea_eligible=(
                 record.pea_eligible
                 if record.pea_eligible is not None
